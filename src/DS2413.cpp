@@ -10,26 +10,33 @@ DS2413::DS2413(uint8_t ID1, uint8_t ID2, uint8_t ID3, uint8_t ID4, uint8_t ID5, 
     pin_latch[1] = false;
 }
 
-void DS2413::duty(OneWireHub *const hub)
+void DS2413::duty(OneWireHub * const hub)
 {
-    uint8_t cmd, data;
+    uint8_t cmd, data, check;
 
     if (hub->recv(&cmd)) return;
 
     switch (cmd)
     {
-        case 0x5A: // PIO ACCESS WRITE
+        case 0x5A:      // PIO ACCESS WRITE
 
             if (hub->recv(&data)) return;
-            data = ~data;                 // Write inverse
-            if (hub->send(&data)) return; // send inverted form for safety
+            data = ~data; // Write inverse
 
-            setPinLatch(0, (data & static_cast<uint8_t>(0x01)) != 0); // A
-            setPinLatch(1, (data & static_cast<uint8_t>(0x02)) != 0); // B
+            if (hub->recv(&check)) return;
+            if (data == check) {
+                    setPinLatch(0, (data & static_cast<uint8_t>(0x01)) != 0);// A
+                    setPinLatch(1, (data & static_cast<uint8_t>(0x02)) != 0);// B
+                    hub->send(0xAA);
+                    goto sendstatus;
+            } else {
+                    hub->send(0xFF);
+            }
+
             break;
 
-        case 0xF5: // PIO ACCESS READ
-
+        case 0xF5:      // PIO ACCESS READ
+sendstatus:
             data = 0;
 
             if (pin_state[0]) data |= static_cast<uint8_t>(0x01);
